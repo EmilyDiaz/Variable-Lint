@@ -1,0 +1,135 @@
+<head></head>
+<body>
+  <style>
+    #results {
+      overflow-y: auto;
+      max-height: 380px;
+    }
+    #log{
+      background-color: #0071bc;
+      padding: 10px 20px;
+      border-radius: 5px;
+      border: none;
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #log:disabled{
+      background-color: #d6d7d9;
+    }
+    #log:hover{
+      background-color: #205493;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #ccc;
+      border-top: 2px solid #333;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .target-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .target-btn svg:hover{
+      fill: #205493;
+    }
+    .target-btn:active {
+      background: #eee;
+    }
+    .target-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: #0071bc;
+    }
+  </style>
+  <h1>Variable Lint</h1>
+  <button id="log">Log variables</button>
+  <div >
+    <p id="results">
+
+    </p>
+  </div>
+  <script>
+    const logBttn=document.getElementById('log')
+    const results=document.getElementById('results')
+
+    function addSpinnerToButton(btn) {
+      if (!btn.querySelector('.spinner')) {
+        const spinner = document.createElement('span');
+        spinner.className = 'spinner';
+        btn.appendChild(spinner);
+      }
+    }
+    function removeSpinnerFromButton(btn) {
+      const spinner = btn.querySelector('.spinner');
+      if (spinner) spinner.remove();
+    }
+
+    logBttn.addEventListener("click", async () => {
+      console.log('Log variables button clicked');
+      logBttn.disabled = true;
+      addSpinnerToButton(logBttn);
+      results.innerHTML = '<em>Scanning for variables used in prototyping...</em>';
+      parent.postMessage({ pluginMessage: { type: 'log-variables' } }, '*');
+    });
+
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage
+      if (!msg || msg.type !== 'variable-names') {
+        return
+      }
+
+      logBttn.disabled = false;
+      removeSpinnerFromButton(logBttn);
+      results.innerHTML = '';
+
+      if (!msg.entries || msg.entries.length === 0) {
+        const p = document.createElement('p');
+        p.textContent = 'No variable names found.';
+        results.appendChild(p);
+        return;
+      }
+
+      for (let i = 0; i < msg.entries.length; i++) {
+        const entry = msg.entries[i];
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '8px';
+
+        const p = document.createElement('p');
+        p.textContent = entry.name;
+        p.style.margin = '0';
+        p.style.flex = '1';
+
+        const btn = document.createElement('button');
+        btn.className = 'target-btn';
+        btn.title = 'Focus on node';
+        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M256 0a256 256 0 1 1 0 512A256 256 0 1 1 256 0zM232 32.6C132.3 45.1 52.9 124.6 40.6 224l55.4 0c10.6-54.4 52.6-97.4 136-107.2L232 32.6zm48 0 0 84.2c83.4 9.8 125.4 52.8 136 107.2l55.4 0C459.1 124.6 379.7 45.1 280 32.6zM232 296l0 183.4C132.3 466.9 52.9 387.4 40.6 288l55.4 0c10.6 54.4 52.6 97.4 136 108zm48 0 0 183.4C379.7 466.9 459.1 387.4 471.4 288l-55.4 0c-10.6 54.4-52.6 97.4-136 108zM208 256a48 48 0 1 1 96 0 48 48 0 1 1 -96 0z"/></svg>';
+
+        btn.addEventListener('click', () => {
+          console.log(`Focus button clicked for node ID: ${entry.nodeId}`);
+          parent.postMessage({ pluginMessage: { type: 'focus-node', nodeId: entry.nodeId } }, '*');
+        });
+
+        row.appendChild(p);
+        row.appendChild(btn);
+        results.appendChild(row);
+      }
+    };
+  </script>
+</body>
