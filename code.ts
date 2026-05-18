@@ -6,14 +6,16 @@ figma.showUI(__html__, { width: 500, height: 400 });
 // Scan reactions across all nodes on the current page.
 
 async function processReactions() {
-  const variableEntries: { name: string; nodeId: string }[] = [];
-  const variableCache: { [id: string]: string | null } = {};
+  const variableEntries: { name: string; nodeId: string; nodeName: string; variableType: string }[] = [];
+  const variableCache: { [id: string]: { name: string; type: string } | null } = {};
 
-  async function getVariableName(id: string): Promise<string | null> {
+  async function getVariableDetails(id: string): Promise<{ name: string; type: string } | null> {
     if (id in variableCache) return variableCache[id];
     try {
       const variable = await figma.variables.getVariableByIdAsync(id);
-      variableCache[id] = variable ? variable.name : null;
+      variableCache[id] = variable
+        ? { name: variable.name, type: variable.resolvedType }
+        : null;
     } catch (error) {
       variableCache[id] = null;
     }
@@ -25,8 +27,17 @@ async function processReactions() {
   });
 
   if (nodesWithReactions.length > 0) {
-    await Promise.all(nodesWithReactions.map(async (node) => {
-      const nodeReactions = (node as any).reactions;
+    // Capture node metadata early before async operations
+    const nodeMetadata = nodesWithReactions.map((node) => ({
+      id: node.id,
+      name: (node as any).name || 'Untitled node',
+      reactions: (node as any).reactions,
+      type: (node as any).type
+    }));
+
+    await Promise.all(nodeMetadata.map(async (nodeMeta) => {
+      console.log('Found node with reactions:', nodeMeta.id, 'name:', nodeMeta.name, 'type:', nodeMeta.type);
+      const nodeReactions = nodeMeta.reactions;
       for (let reaction of nodeReactions) {
         const matches: any[] = [];
         for (let action of (reaction.actions || [])) {
@@ -40,20 +51,44 @@ async function processReactions() {
                 if (block.actions && Array.isArray(block.actions)) {
                   const setVarActions = block.actions.filter((a: any) => a.type === 'SET_VARIABLE');
                   await Promise.all(setVarActions.map(async (action: any) => {
-                    const name = await getVariableName(action.variableId);
-                    if (name) variableEntries.push({ name, nodeId: node.id });
+                    const details = await getVariableDetails(action.variableId);
+                    if (details) {
+                      variableEntries.push({
+                        name: details.name,
+                        nodeId: nodeMeta.id,
+                        nodeName: nodeMeta.name,
+                        variableType: details.type
+                      });
+                    }
                   }));
                 }
 
                 if (block.condition && block.condition.value && block.condition.value.expressionArguments) {
                   await Promise.all(block.condition.value.expressionArguments.map(async (arg: any) => {
                     if (arg.type === 'VARIABLE_ALIAS' && arg.value && arg.value.id) {
-                      const name = await getVariableName(arg.value.id);
-                      if (name) variableEntries.push({ name, nodeId: node.id });
+                      const details = await getVariableDetails(arg.value.id);
+                      if (details) {
+                        variableEntries.push({
+                          name: details.name,
+                          nodeId: nodeMeta.id,
+                          nodeName: nodeMeta.name,
+                          variableType: details.type
+                        });
+                      }
                     }
                   }));
                 }
               }
+            }
+          } else if (match.type === 'SET_VARIABLE') {
+            const details = await getVariableDetails(match.variableId);
+            if (details) {
+              variableEntries.push({
+                name: details.name,
+                nodeId: nodeMeta.id,
+                nodeName: nodeMeta.name,
+                variableType: details.type
+              });
             }
           }
         }
@@ -71,7 +106,7 @@ async function processReactions() {
     seen.add(key);
     return true;
   });
-  figma.ui.postMessage({ type: 'variable-names', entries: uniqueEntries });
+  figma.ui.postMessage({ type: 'variable-names', entries: uniqueEntries, pageName: figma.currentPage.name });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

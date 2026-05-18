@@ -1,24 +1,59 @@
-<head></head>
+<head><style>html, body { height: 100%; }</style></head>
 <body>
   <style>
-    #results {
-      overflow-y: auto;
-      max-height: 380px;
+    body {
+      font-family: Inter, sans-serif;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-sizing: border-box;
+      padding: 10px;
     }
-    #log{
+    .description {
+      margin: 0;
+      font-weight: 400;
+      font-size: 15px;
+    }
+    #resultsHeading {
+      display: none;
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    #results {
+      overflow-y: visible;
+    }
+    #results-wrapper {
+      flex: 1;
+      overflow-y: auto;
+    }
+    #bttndiv{
+       border-top: 1px solid #d6d7d9;
+        padding-left: 10px;
+        padding-right: 10px;
+
+
+    }
+    #scan {
       background-color: #0071bc;
       padding: 10px 20px;
       border-radius: 5px;
       border: none;
       color: white;
       font-weight: 700;
-      cursor: pointer;
+      align-self: flex-start;
+      font-size: 13px;
+      margin-top: 10px;
+      margin-bottom: 10px;
+     
     }
-    #log:disabled{
-      background-color: #d6d7d9;
+    #scan:disabled {
+      background-color: #d6d7d9 !important;
+      cursor: not-allowed !important;
     }
-    #log:hover{
+    #scan:hover {
       background-color: #205493;
+      cursor: pointer;
     }
     .spinner {
       display: inline-block;
@@ -43,8 +78,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
-    .target-btn svg:hover{
+    .target-btn svg:hover {
       fill: #205493;
     }
     .target-btn:active {
@@ -55,17 +91,205 @@
       height: 18px;
       fill: #0071bc;
     }
+    .target-btn.selected-focus {
+      background: #f3e8ff;
+      border-radius: 6px;
+    }
+    .target-btn.selected-focus svg {
+      fill: #7e22ce;
+    }
+    .target-btn.selected-focus svg:hover {
+      fill: #6b21a8;
+    }
+    .expand-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .expand-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: #0071bc
+    }
+    .variable-card {
+      border: 1.5px solid #0071bc;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .variable-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .variable-title {
+      margin: 0;
+      flex: 1;
+      font-size: 13px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .type-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: 0.3px;
+      color: #072447;
+      background: #dbeafe;
+      border: 1px solid transparent;
+    }
+    .type-badge.type-BOOLEAN {
+      color: #4a044e;
+      background: #f5d0fe;
+      border-color: #e879f9;
+    }
+    .type-badge.type-STRING {
+      color: #713f12;
+      background: #fef08a;
+      border-color: #facc15;
+    }
+    .type-badge.type-FLOAT {
+      color: #14532d;
+      background: #86efac;
+      border-color: #4ade80;
+    }
+    .type-badge.type-COLOR {
+      color: #155e75;
+      background: #a5f3fc;
+      border-color: #22d3ee;
+    }
+    .type-badge.type-UNKNOWN {
+      color: #374151;
+      background: #e5e7eb;
+      border-color: #d1d5db;
+    }
+    .node-list {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .node-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-left: 12px;
+    }
+    .node-name {
+      margin: 0;
+      flex: 1;
+      font-size: 13px;
+      color: #444;
+    }
+    .variable-title.selected-label,
+    .node-name.selected-label {
+      font-weight: 700;
+      color: #111;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .loading-msg {
+      font-size: 17px;
+      color: #555;
+    }
+    .cycle-msg {
+      position: absolute;
+      left: 0;
+      opacity: 0;
+      animation: cycleMsg 4200ms infinite;
+    }
+    #loading-area {
+      position: relative;
+      height: 24px;
+    }
+    @keyframes cycleMsg {
+      0%   { opacity: 0; }
+      5%   { opacity: 1; }
+      28%  { opacity: 1; }
+      33%  { opacity: 0; }
+      100% { opacity: 0; }
+    }
+    #search-container {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    #search-bar {
+      flex: 1;
+      max-width: 200px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 13px;
+    }
+    #search-bar:focus {
+      outline: none;
+      border-color: #0071bc;
+      box-shadow: 0 0 0 2px #0071bc;
+    }
   </style>
-  <h1>Variable Lint</h1>
-  <button id="log">Log variables</button>
-  <div >
-    <p id="results">
-
-    </p>
+  <p class="description">
+    This plugin scans the current page you are on to find variables used in prototyping.
+   
+  </p>
+  
+  <h2 id="resultsHeading">Results on page <span id="pageNameSpan"></span>:</h2>
+  <div id="search-container">
+    <p id="variableCount" style="margin:0; font-size:13px;"></p>
+  </div>
+  <div id="loading-area" style="display:none;">
+    <em class="loading-msg cycle-msg" style="animation-delay:0ms">Investigating frames...</em>
+    <em class="loading-msg cycle-msg" style="animation-delay:1400ms">Scanning for variables...</em>
+    <em class="loading-msg cycle-msg" style="animation-delay:2800ms">Untangling prototypes...</em>
+  </div>
+  <div id="results-wrapper">
+    <div id="results"></div>
+  </div>
+  <div id="bttndiv">
+    <button id="scan">Scan page</button>
   </div>
   <script>
-    const logBttn=document.getElementById('log')
+    const logBttn=document.getElementById('scan')
     const results=document.getElementById('results')
+    const resultsHeading=document.getElementById('resultsHeading')
+    const pageNameSpan=document.getElementById('pageNameSpan')
+    const variableCount=document.getElementById('variableCount')
+    const searchContainer=document.getElementById('search-container')
+    let selectedNodeId = null;
+    const selectionBindings = [];
+
+    function resetSelectionBindings() {
+      selectionBindings.length = 0;
+    }
+
+    function updateSelectionStyles() {
+      for (let i = 0; i < selectionBindings.length; i++) {
+        const binding = selectionBindings[i];
+        const isSelected = binding.nodeId === selectedNodeId;
+        binding.button.classList.toggle('selected-focus', isSelected);
+        binding.label.classList.toggle('selected-label', isSelected);
+      }
+    }
 
     function addSpinnerToButton(btn) {
       if (!btn.querySelector('.spinner')) {
@@ -79,57 +303,214 @@
       if (spinner) spinner.remove();
     }
 
+    const loadingArea = document.getElementById('loading-area');
+
+    function startLoadingMessages() {
+      results.innerHTML = '';
+      loadingArea.style.display = 'block';
+    }
+
+    function stopLoadingMessages() {
+      loadingArea.style.display = 'none';
+    }
+
+    function createFocusButton(nodeId, onSelect) {
+      const btn = document.createElement('button');
+      btn.className = 'target-btn';
+      btn.title = 'Focus on node';
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 2h2v2.06a8.003 8.003 0 0 1 6.94 6.94H22v2h-2.06a8.003 8.003 0 0 1-6.94 6.94V22h-2v-2.06a8.003 8.003 0 0 1-6.94-6.94H2v-2h2.06a8.003 8.003 0 0 1 6.94-6.94V2zm1 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/></svg>';
+      btn.addEventListener('click', () => {
+        console.log(`Focus button clicked for node ID: ${nodeId}`);
+        if (typeof onSelect === 'function') {
+          onSelect(nodeId);
+        }
+        parent.postMessage({ pluginMessage: { type: 'focus-node', nodeId } }, '*');
+      });
+      return btn;
+    }
+
+    function normalizeType(variableType) {
+      if (!variableType || typeof variableType !== 'string') return 'UNKNOWN';
+      return variableType.toUpperCase();
+    }
+
+    function badgeLabelForType(variableType) {
+      const type = normalizeType(variableType);
+      if (type === 'BOOLEAN') return 'BOOL';
+      if (type === 'STRING') return 'STR';
+      if (type === 'FLOAT') return 'NUM';
+      if (type === 'COLOR') return 'CLR';
+      return 'UNK';
+    }
+
+    function createTypeBadge(variableType) {
+      const normalizedType = normalizeType(variableType);
+      const badge = document.createElement('span');
+      badge.className = `type-badge type-${normalizedType}`;
+      badge.textContent = badgeLabelForType(normalizedType);
+      badge.title = normalizedType;
+      return badge;
+    }
+
+    function createExpandButton(list, startsExpanded) {
+      const btn = document.createElement('button');
+      btn.className = 'expand-btn';
+      btn.title = startsExpanded ? 'Collapse nodes' : 'Expand nodes';
+
+      function renderIcon(expanded) {
+        btn.innerHTML = expanded
+          ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path d="M137.4 150.6c12.5-12.5 32.8-12.5 45.3 0l128 128c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L160 218.5 54.6 323.9c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3l128-128z"/></svg>'
+          : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path d="M137.4 361.4c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L160 293.5 54.6 188.1c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128z"/></svg>';
+      }
+
+      let expanded = startsExpanded;
+      list.style.display = expanded ? 'flex' : 'none';
+      renderIcon(expanded);
+
+      btn.addEventListener('click', () => {
+        expanded = !expanded;
+        list.style.display = expanded ? 'flex' : 'none';
+        btn.title = expanded ? 'Collapse nodes' : 'Expand nodes';
+        renderIcon(expanded);
+      });
+
+      return btn;
+    }
+
+    const searchBar = document.createElement('input');
+    searchBar.id = 'search-bar';
+    searchBar.type = 'text';
+    searchBar.placeholder = 'Search variables...';
+    searchBar.addEventListener('input', (event) => {
+      const query = event.target.value.toLowerCase();
+      const variableCards = document.querySelectorAll('.variable-card');
+      variableCards.forEach((card) => {
+        const title = card.querySelector('.variable-title').textContent.toLowerCase();
+        if (title.includes(query)) {
+          card.style.display = '';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+
     logBttn.addEventListener("click", async () => {
       console.log('Log variables button clicked');
       logBttn.disabled = true;
       addSpinnerToButton(logBttn);
-      results.innerHTML = '<em>Scanning for variables used in prototyping...</em>';
+      resultsHeading.style.display = 'none';
+      searchContainer.style.display = 'none';
+      searchBar.value = '';
+      startLoadingMessages();
       parent.postMessage({ pluginMessage: { type: 'log-variables' } }, '*');
     });
 
     window.onmessage = (event) => {
-      const msg = event.data.pluginMessage
+      const msg = event.data.pluginMessage;
       if (!msg || msg.type !== 'variable-names') {
-        return
+        return;
       }
 
       logBttn.disabled = false;
       removeSpinnerFromButton(logBttn);
+      stopLoadingMessages();
       results.innerHTML = '';
+      selectedNodeId = null;
+      resetSelectionBindings();
 
-      if (!msg.entries || msg.entries.length === 0) {
+      const entries = msg.entries || [];
+      console.log('Received entries:', entries);
+      entries.forEach((entry) => {
+        console.log('Entry:', entry.name, 'nodeId:', entry.nodeId, 'nodeName:', entry.nodeName, 'variableType:', entry.variableType);
+      });
+      const uniqueNames = new Set(entries.map((entry) => entry.name));
+      const pageName = msg.pageName || 'page';
+      pageNameSpan.textContent = pageName;
+      resultsHeading.style.display = 'block';
+      variableCount.textContent = `Number of variables: ${uniqueNames.size}`;
+      variableCount.style.display = 'block';
+      searchContainer.style.display = 'flex';
+
+      if (entries.length === 0) {
         const p = document.createElement('p');
         p.textContent = 'No variable names found.';
         results.appendChild(p);
         return;
       }
 
-      for (let i = 0; i < msg.entries.length; i++) {
-        const entry = msg.entries[i];
-        const row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.alignItems = 'center';
-        row.style.gap = '8px';
-
-        const p = document.createElement('p');
-        p.textContent = entry.name;
-        p.style.margin = '0';
-        p.style.flex = '1';
-
-        const btn = document.createElement('button');
-        btn.className = 'target-btn';
-        btn.title = 'Focus on node';
-        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M256 0a256 256 0 1 1 0 512A256 256 0 1 1 256 0zM232 32.6C132.3 45.1 52.9 124.6 40.6 224l55.4 0c10.6-54.4 52.6-97.4 136-107.2L232 32.6zm48 0 0 84.2c83.4 9.8 125.4 52.8 136 107.2l55.4 0C459.1 124.6 379.7 45.1 280 32.6zM232 296l0 183.4C132.3 466.9 52.9 387.4 40.6 288l55.4 0c10.6 54.4 52.6 97.4 136 108zm48 0 0 183.4C379.7 466.9 459.1 387.4 471.4 288l-55.4 0c-10.6 54.4-52.6 97.4-136 108zM208 256a48 48 0 1 1 96 0 48 48 0 1 1 -96 0z"/></svg>';
-
-        btn.addEventListener('click', () => {
-          console.log(`Focus button clicked for node ID: ${entry.nodeId}`);
-          parent.postMessage({ pluginMessage: { type: 'focus-node', nodeId: entry.nodeId } }, '*');
-        });
-
-        row.appendChild(p);
-        row.appendChild(btn);
-        results.appendChild(row);
+      searchBar.style.display = 'block';
+      const groupedByVariable = new Map();
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (!groupedByVariable.has(entry.name)) {
+          groupedByVariable.set(entry.name, []);
+        }
+        groupedByVariable.get(entry.name).push(entry);
       }
+
+      for (const [variableName, nodes] of groupedByVariable.entries()) {
+        const card = document.createElement('div');
+        card.className = 'variable-card';
+
+        const header = document.createElement('div');
+        header.className = 'variable-header';
+
+        const title = document.createElement('p');
+        title.className = 'variable-title';
+        title.textContent = nodes.length > 1 ? `${variableName} (Occurances: ${nodes.length})` : variableName;
+
+        const headerActions = document.createElement('div');
+        headerActions.className = 'header-actions';
+        headerActions.appendChild(createTypeBadge(nodes[0].variableType));
+
+        if (nodes.length === 1) {
+          const focusButton = createFocusButton(nodes[0].nodeId, (nodeId) => {
+            selectedNodeId = nodeId;
+            updateSelectionStyles();
+          });
+          selectionBindings.push({ nodeId: nodes[0].nodeId, button: focusButton, label: title });
+          header.appendChild(title);
+          headerActions.appendChild(focusButton);
+          header.appendChild(headerActions);
+          card.appendChild(header);
+          results.appendChild(card);
+          continue;
+        }
+
+        const nodeList = document.createElement('div');
+        nodeList.className = 'node-list';
+
+        for (let i = 0; i < nodes.length; i++) {
+          const nodeEntry = nodes[i];
+          const nodeRow = document.createElement('div');
+          nodeRow.className = 'node-row';
+
+          const nodeName = document.createElement('p');
+          nodeName.className = 'node-name';
+          nodeName.textContent = nodeEntry.nodeName || 'Untitled node';
+
+          const focusButton = createFocusButton(nodeEntry.nodeId, (nodeId) => {
+            selectedNodeId = nodeId;
+            updateSelectionStyles();
+          });
+          selectionBindings.push({ nodeId: nodeEntry.nodeId, button: focusButton, label: nodeName });
+          nodeRow.appendChild(nodeName);
+          nodeRow.appendChild(focusButton);
+          nodeList.appendChild(nodeRow);
+        }
+
+        header.appendChild(title);
+        headerActions.appendChild(createExpandButton(nodeList, false));
+        header.appendChild(headerActions);
+        card.appendChild(header);
+        card.appendChild(nodeList);
+        results.appendChild(card);
+      }
+
+      updateSelectionStyles();
     };
+
+    const buttonDiv = document.getElementById('bttndiv');
+    searchContainer.appendChild(searchBar);
   </script>
 </body>

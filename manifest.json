@@ -1,5 +1,5 @@
 {
-  "name": "Variable Lint",
+  "name": "Prototype Variable Scanner",
   "id": "1636739726161273483",
   "api": "1.0.0",
   "main": "code.js",
