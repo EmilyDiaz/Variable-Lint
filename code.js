@@ -1,96 +1,144 @@
 "use strict";
 /// <reference types="@figma/plugin-typings" />
+const DEBUG = false;
 figma.showUI(__html__, { width: 500, height: 400 });
 // Scan reactions across all nodes on the current page.
+let cachedScan = null;
+// Persistent cache for variable lookups across scans
+const globalVariableCache = {};
 async function processReactions() {
     const variableEntries = [];
-    const variableCache = {};
-    async function getVariableDetails(id) {
-        if (id in variableCache)
-            return variableCache[id];
+    // Helper: post progress to UI
+    function postProgress(stage, details) {
         try {
-            const variable = await figma.variables.getVariableByIdAsync(id);
-            variableCache[id] = variable
-                ? { name: variable.name, type: variable.resolvedType }
-                : null;
+            figma.ui.postMessage({ type: 'scan-progress', stage, details, pageName: figma.currentPage.name });
+        }
+        catch (e) {
+            // ignore UI message errors
+        }
+    }
+    // Iterative traversal to collect only nodes that have reactions
+    const nodesWithReactions = [];
+    let nodeCount = 0;
+    let reactionCount = 0;
+    const stack = [figma.currentPage];
+    while (stack.length) {
+        const node = stack.pop();
+        try {
+            nodeCount += 1;
+            if ('reactions' in node && Array.isArray(node.reactions) && node.reactions.length > 0) {
+                reactionCount += node.reactions.length;
+                nodesWithReactions.push(node);
+            }
+            if ('children' in node && Array.isArray(node.children)) {
+                for (const child of node.children)
+                    stack.push(child);
+            }
         }
         catch (error) {
-            variableCache[id] = null;
+            // skip inaccessible nodes
         }
-        return variableCache[id];
     }
-    const nodesWithReactions = figma.currentPage.findAll((node) => {
-        return 'reactions' in node && Array.isArray(node.reactions) && node.reactions.length > 0;
-    });
-    if (nodesWithReactions.length > 0) {
-        // Capture node metadata early before async operations
-        const nodeMetadata = nodesWithReactions.map((node) => ({
-            id: node.id,
-            name: node.name || 'Untitled node',
-            reactions: node.reactions,
-            type: node.type
-        }));
-        await Promise.all(nodeMetadata.map(async (nodeMeta) => {
-            console.log('Found node with reactions:', nodeMeta.id, 'name:', nodeMeta.name, 'type:', nodeMeta.type);
-            const nodeReactions = nodeMeta.reactions;
-            for (let reaction of nodeReactions) {
-                const matches = [];
-                for (let action of (reaction.actions || [])) {
-                    matches.push(...findActionsByType(action, ['CONDITIONAL', 'SET_VARIABLE']));
-                }
-                for (let match of matches) {
-                    if (match.type === 'CONDITIONAL') {
-                        if (match.conditionalBlocks && Array.isArray(match.conditionalBlocks)) {
-                            for (let block of match.conditionalBlocks) {
-                                if (block.actions && Array.isArray(block.actions)) {
-                                    const setVarActions = block.actions.filter((a) => a.type === 'SET_VARIABLE');
-                                    await Promise.all(setVarActions.map(async (action) => {
-                                        const details = await getVariableDetails(action.variableId);
-                                        if (details) {
-                                            variableEntries.push({
-                                                name: details.name,
-                                                nodeId: nodeMeta.id,
-                                                nodeName: nodeMeta.name,
-                                                variableType: details.type
-                                            });
-                                        }
-                                    }));
-                                }
-                                if (block.condition && block.condition.value && block.condition.value.expressionArguments) {
-                                    await Promise.all(block.condition.value.expressionArguments.map(async (arg) => {
-                                        if (arg.type === 'VARIABLE_ALIAS' && arg.value && arg.value.id) {
-                                            const details = await getVariableDetails(arg.value.id);
-                                            if (details) {
-                                                variableEntries.push({
-                                                    name: details.name,
-                                                    nodeId: nodeMeta.id,
-                                                    nodeName: nodeMeta.name,
-                                                    variableType: details.type
-                                                });
-                                            }
-                                        }
-                                    }));
-                                }
+    const pageSignature = `${figma.currentPage.id}|nodes:${nodeCount}|reactions:${reactionCount}`;
+    if (cachedScan && cachedScan.pageSignature === pageSignature) {
+        postProgress('cached');
+        figma.ui.postMessage({ type: 'variable-names', entries: cachedScan.entries, pageName: figma.currentPage.name });
+        return;
+    }
+    if (nodesWithReactions.length === 0) {
+        postProgress('no-reactions');
+        figma.ui.postMessage({ type: 'variable-names', entries: [], pageName: figma.currentPage.name });
+        return;
+    }
+    postProgress('collected-nodes', { nodes: nodesWithReactions.length, reactions: reactionCount });
+    // Collect variable IDs (single pass) and cache parsed matches per node
+    const nodeMatchesMap = new Map();
+    const allVariableIds = new Set();
+    for (const node of nodesWithReactions) {
+        const matches = [];
+        for (const reaction of node.reactions) {
+            const found = findActionsByType(reaction, ['CONDITIONAL', 'SET_VARIABLE']);
+            matches.push(...found);
+            for (const match of found) {
+                if (match.type === 'SET_VARIABLE' && match.variableId)
+                    allVariableIds.add(match.variableId);
+                else if (match.type === 'CONDITIONAL' && match.conditionalBlocks) {
+                    for (const block of match.conditionalBlocks) {
+                        if (block.actions) {
+                            for (const action of block.actions) {
+                                if (action.type === 'SET_VARIABLE' && action.variableId)
+                                    allVariableIds.add(action.variableId);
                             }
                         }
-                    }
-                    else if (match.type === 'SET_VARIABLE') {
-                        const details = await getVariableDetails(match.variableId);
-                        if (details) {
-                            variableEntries.push({
-                                name: details.name,
-                                nodeId: nodeMeta.id,
-                                nodeName: nodeMeta.name,
-                                variableType: details.type
-                            });
+                        if (block.condition && block.condition.value && block.condition.value.expressionArguments) {
+                            for (const arg of block.condition.value.expressionArguments) {
+                                if (arg.type === 'VARIABLE_ALIAS' && arg.value && arg.value.id)
+                                    allVariableIds.add(arg.value.id);
+                            }
                         }
                     }
                 }
             }
-        }));
+        }
+        nodeMatchesMap.set(node.id, matches);
     }
-    else {
-        console.log('No reactions found on this page.');
+    postProgress('collected-variables', { variables: allVariableIds.size });
+    // Batch fetch variables with limited concurrency
+    const ids = Array.from(allVariableIds);
+    const CHUNK = 20;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK);
+        await Promise.all(chunk.map(async (id) => {
+            if (id in globalVariableCache)
+                return;
+            try {
+                const variable = await figma.variables.getVariableByIdAsync(id);
+                globalVariableCache[id] = variable ? { name: variable.name, type: variable.resolvedType } : null;
+            }
+            catch (e) {
+                globalVariableCache[id] = null;
+            }
+        }));
+        postProgress('batch-fetched', { fetched: Math.min(i + CHUNK, ids.length), total: ids.length });
+    }
+    // Build entries using cached variable details
+    for (const node of nodesWithReactions) {
+        try {
+            const nodeName = node.name || 'Untitled node';
+            const matches = nodeMatchesMap.get(node.id) || [];
+            for (const match of matches) {
+                if (match.type === 'CONDITIONAL' && match.conditionalBlocks) {
+                    for (const block of match.conditionalBlocks) {
+                        if (block.actions) {
+                            for (const action of block.actions) {
+                                if (action.type === 'SET_VARIABLE' && action.variableId) {
+                                    const details = globalVariableCache[action.variableId] || null;
+                                    if (details)
+                                        variableEntries.push({ name: details.name, nodeId: node.id, nodeName, variableType: details.type });
+                                }
+                            }
+                        }
+                        if (block.condition && block.condition.value && block.condition.value.expressionArguments) {
+                            for (const arg of block.condition.value.expressionArguments) {
+                                if (arg.type === 'VARIABLE_ALIAS' && arg.value && arg.value.id) {
+                                    const details = globalVariableCache[arg.value.id] || null;
+                                    if (details)
+                                        variableEntries.push({ name: details.name, nodeId: node.id, nodeName, variableType: details.type });
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (match.type === 'SET_VARIABLE' && match.variableId) {
+                    const details = globalVariableCache[match.variableId] || null;
+                    if (details)
+                        variableEntries.push({ name: details.name, nodeId: node.id, nodeName, variableType: details.type });
+                }
+            }
+        }
+        catch (e) {
+            // continue on error per-node
+        }
     }
     // Deduplicate by name+nodeId pair
     const seen = new Set();
@@ -101,6 +149,12 @@ async function processReactions() {
         seen.add(key);
         return true;
     });
+    if (pageSignature) {
+        cachedScan = {
+            pageSignature,
+            entries: uniqueEntries
+        };
+    }
     figma.ui.postMessage({ type: 'variable-names', entries: uniqueEntries, pageName: figma.currentPage.name });
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,12 +171,27 @@ function findActionsByType(action, targetTypes) {
     return results;
 }
 figma.ui.onmessage = async (msg) => {
+    function isValidUIMessage(m) {
+        if (!m || typeof m !== 'object')
+            return false;
+        if (typeof m.type !== 'string')
+            return false;
+        if (m.type === 'focus-node')
+            return typeof m.nodeId === 'string';
+        return ['log-variables', 'close-plugin'].includes(m.type);
+    }
+    if (!isValidUIMessage(msg)) {
+        if (DEBUG)
+            console.warn('Ignored invalid UI message from UI', msg);
+        return;
+    }
     if (msg.type === 'log-variables') {
         await processReactions();
         return;
     }
     if (msg.type === 'focus-node') {
-        console.log(`Attempting to focus on node with ID: ${msg.nodeId}`);
+        if (DEBUG)
+            console.log(`Attempting to focus on node with ID: ${msg.nodeId}`);
         try {
             const node = await figma.getNodeByIdAsync(msg.nodeId);
             if (!node) {
@@ -133,7 +202,8 @@ figma.ui.onmessage = async (msg) => {
                 // Focus on the node without modifying its locked or visible state
                 figma.currentPage.selection = [node];
                 figma.viewport.scrollAndZoomIntoView([node]);
-                console.log(`Successfully focused on node with ID: ${msg.nodeId}`);
+                if (DEBUG)
+                    console.log(`Successfully focused on node with ID: ${msg.nodeId}`);
             }
             else {
                 console.error(`Cannot focus on node with ID: ${msg.nodeId}. Unsupported type: ${node.type}`);

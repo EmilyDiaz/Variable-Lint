@@ -38,3 +38,10 @@ We recommend writing TypeScript code using Visual Studio code:
     you reopen Visual Studio Code.
 
 That's it! Visual Studio Code will regenerate the JavaScript file every time you save.
+
+## Privacy
+
+- **Data accessed:** This plugin reads Figma design data locally to perform its function: page name, node IDs, node names, and variable names used in prototypes.
+- **No external transmission:** The plugin does not send design data to external servers. `networkAccess` in the plugin manifest is restricted and there are no `fetch`/XHR or analytics libraries in this repository.
+- **Logging:** Debug console logs may contain design data during development. Production builds should set `DEBUG` to `false` to minimize logging.
+- **Consent & changes:** If external telemetry is ever added, it should be implemented only with explicit user consent and documented in this README.

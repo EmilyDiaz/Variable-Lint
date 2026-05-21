@@ -8,6 +8,8 @@
       gap: 12px;
       box-sizing: border-box;
       padding: 10px;
+      overflow: hidden;
+      height: 100%;
     }
     .description {
       margin: 0;
@@ -269,6 +271,8 @@
     <button id="scan">Scan page</button>
   </div>
   <script>
+    const DEBUG = false;
+
     const logBttn=document.getElementById('scan')
     const results=document.getElementById('results')
     const resultsHeading=document.getElementById('resultsHeading')
@@ -320,7 +324,7 @@
       btn.title = 'Focus on node';
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 2h2v2.06a8.003 8.003 0 0 1 6.94 6.94H22v2h-2.06a8.003 8.003 0 0 1-6.94 6.94V22h-2v-2.06a8.003 8.003 0 0 1-6.94-6.94H2v-2h2.06a8.003 8.003 0 0 1 6.94-6.94V2zm1 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/></svg>';
       btn.addEventListener('click', () => {
-        console.log(`Focus button clicked for node ID: ${nodeId}`);
+        if (DEBUG) console.log(`Focus button clicked for node ID: ${nodeId}`);
         if (typeof onSelect === 'function') {
           onSelect(nodeId);
         }
@@ -395,7 +399,7 @@
     });
 
     logBttn.addEventListener("click", async () => {
-      console.log('Log variables button clicked');
+      if (DEBUG) console.log('Log variables button clicked');
       logBttn.disabled = true;
       addSpinnerToButton(logBttn);
       resultsHeading.style.display = 'none';
@@ -406,8 +410,9 @@
     });
 
     window.onmessage = (event) => {
-      const msg = event.data.pluginMessage;
-      if (!msg || msg.type !== 'variable-names') {
+      const msg = event && event.data && event.data.pluginMessage;
+      if (!msg || msg.type !== 'variable-names' || !Array.isArray(msg.entries)) {
+        if (DEBUG) console.warn('Ignored unexpected message from plugin', msg);
         return;
       }
 
@@ -419,8 +424,8 @@
       resetSelectionBindings();
 
       const entries = msg.entries || [];
-      console.log('Received entries:', entries);
-      entries.forEach((entry) => {
+      if (DEBUG) console.log('Received entries:', entries);
+      if (DEBUG) entries.forEach((entry) => {
         console.log('Entry:', entry.name, 'nodeId:', entry.nodeId, 'nodeName:', entry.nodeName, 'variableType:', entry.variableType);
       });
       const uniqueNames = new Set(entries.map((entry) => entry.name));
